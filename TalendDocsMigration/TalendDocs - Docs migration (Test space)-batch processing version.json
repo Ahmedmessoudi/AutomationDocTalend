@@ -1,0 +1,1561 @@
+  {
+  "name": "TalendDocs - Docs migration (Test space)-batch processing version",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        25072,
+        14160
+      ],
+      "id": "49df75b5-951d-48ef-97ca-03f947a4e138",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "confluenceBaseUrl",
+              "value": "https://ahmedmessoudi.atlassian.net/wiki"
+            },
+            {
+              "name": "branch",
+              "value": "main"
+            },
+            {
+              "name": "githubOwner",
+              "value": "integration-team-OS"
+            },
+            {
+              "name": "githubRepo",
+              "value": "AutomatisationDocTalend"
+            },
+            {
+              "name": "spacekey",
+              "value": "Test"
+            }
+          ],
+          "number": [
+            {
+              "name": "sourceFolderId",
+              "value": 9240606
+            },
+            {
+              "name": "targetFolderId",
+              "value": 9437211
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        25344,
+        14160
+      ],
+      "id": "425cf46c-c6eb-4293-b777-ba6112a22f32",
+      "name": "Config"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Config').item.json.confluenceBaseUrl }}/api/v2/folders/{{ $('Config').item.json.sourceFolderId }}/direct-children",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "250"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        25872,
+        14160
+      ],
+      "id": "e4b36b23-b4e6-41b1-8ce5-fc4c14a91cfd",
+      "name": "Confluence: Get Child Job Pages",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "rfsEyMLkr3h7TyW1",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $json.githubOwner }}/{{ $json.githubRepo }}/git/trees/{{ $json.branch }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "recursive",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        25584,
+        14160
+      ],
+      "id": "596e56d0-52c4-4a51-909b-e1717ae87464",
+      "name": "GitHub: Get Repo Tree",
+      "credentials": {
+        "githubApi": {
+          "id": "6J9lNMOILGDrZr2T",
+          "name": "GitHub account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3d915d5c-61b5-4f4c-aff4-cdbe49e47387",
+              "leftValue": "={{ $json.matchFound }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        26592,
+        14160
+      ],
+      "id": "e0969235-9121-4a8c-8f71-f95ff5d0d9d7",
+      "name": "GitHub File Found?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst timestamp = new Date().toISOString();\nconst logLine = `[${timestamp}] [GITHUB_FILE_NOT_FOUND] Job: \"${item.jobName}\" | ${item.reason}\\n`;\nconst buffer = Buffer.from(logLine, 'utf-8');\nreturn [{\n  json: { filePath: '/home/node/.n8n-files/n8n_workflow.log' },\n  binary: { data: { data: buffer.toString('base64'), mimeType: 'text/plain', fileName: 'n8n_workflow.log' } }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        26880,
+        14336
+      ],
+      "id": "168ee8aa-50b1-41af-abb1-568725bd30e4",
+      "name": "Log Skipped Job (No Match)"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.filePath }}",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        27120,
+        14336
+      ],
+      "id": "9ba6c5e6-39d8-4017-a27a-7d8246785c6f",
+      "name": "Write Skipped Job Log",
+      "retryOnFail": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "content": "Run manually. Config hardcodes the Confluence folder:\nadd the source folder id and and the target folder id\n\n\nJob pages found -> matched to GitHub .item files -> fed straight into the original parse/LLM-diagram/HTML/create-or-update pipeline.",
+        "height": 220,
+        "width": 1068
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        24912,
+        13744
+      ],
+      "id": "3ac8a93b-1d49-4125-8b3c-74bc5d9eadb5",
+      "name": "Sticky Note - New Front End"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        27360,
+        14144
+      ],
+      "id": "be4a297a-6b1e-4ada-afa9-095c30a0571c",
+      "name": "XML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\n// ============================================================\n// 🔒 SAFE HELPERS (Defined once outside the loop)\n// ============================================================\nfunction getParam(node, paramName) {\n  if (!node || !Array.isArray(node.elementParameter)) return null;\n  const param = node.elementParameter.find(p => p && p.name === paramName);\n  if (!param || param.value === undefined || param.value === null) return null;\n  return String(param.value).replace(/^\"|\"$/g, '');\n}\n\nfunction findDynamicParam(node, possibleNames) {\n  if (!node || !Array.isArray(node.elementParameter)) return null;\n  for (const name of possibleNames) {\n    const param = node.elementParameter.find(p => p && p.name && p.name.toUpperCase() === name.toUpperCase());\n    if (param && param.value !== undefined && param.value !== null && String(param.value).trim() !== \"\") {\n      return String(param.value).replace(/^\"|\"$/g, '');\n    }\n  }\n  return null;\n}\n\nfunction cleanFileName(rawName) {\n  if (!rawName || rawName === \"N/A\") return \"N/A\";\n  let cleaned = String(rawName).replace(/^\"|\"$/g, '');\n  const fileMatch = cleaned.match(/[\"']?([a-zA-Z0-9_\\-]+\\.(csv|xlsx|xml|json|txt|dat|zip|gz))[\"']?/i);\n  if (fileMatch) return fileMatch[1];\n  if (cleaned.includes(\"globalMap\") || cleaned.includes(\"context.\") || cleaned.includes(\"row\")) {\n    return \"(dynamic filename)\";\n  }\n  const pathParts = cleaned.split(/[\\\\/]/);\n  if (pathParts.length > 1) return pathParts[pathParts.length - 1];\n  return cleaned;\n}\n\nfunction getGDriveProp(node, propName) {\n  if (!node || !Array.isArray(node.elementParameter)) return null;\n  const propParam = node.elementParameter.find(p => p && p.name === \"PROPERTIES\");\n  if (!propParam || !propParam.value) return null;\n  let props = propParam.value;\n  if (typeof props === 'string') {\n    try { props = JSON.parse(props); } catch(e) { return null; }\n  }\n  const prop = props[propName];\n  if (!prop) return null;\n  let val = prop.storedValue !== undefined ? prop.storedValue : prop;\n  if (val === null || val === undefined) return null;\n  if (typeof val === 'object' && val.name !== undefined) return val.name;\n  if (typeof val === 'object' && val.value !== undefined) return val.value;\n  if (typeof val === 'string') return val.replace(/^\"|\"$/g, '').replace(/\\\\\"/g, '\"');\n  return val;\n}\n\nfunction getNodeLabel(node) {\n  if (!node || !Array.isArray(node.elementParameter)) return null;\n  const labelParam = node.elementParameter.find(p => p && p.name === \"LABEL\");\n  if (!labelParam || !labelParam.value) return null;\n  \n  let labelValue = String(labelParam.value);\n  const brMatch = labelValue.match(/<br\\s*\\/?>(.+)/i);\n  if (brMatch && brMatch[1]) {\n    return brMatch[1].trim();\n  }\n  return labelValue.replace(/<[^>]*>/g, '').trim();\n}\n\nfunction classifyComponent(compName) {\n  const name = compName.toLowerCase();\n  if (/db|mysql|postgresql|oracle|mssql|sqlserver|jdbc|snowflake|synapse|bigquery|redshift|sqlite|mariadb|cassandra|mongodb|db2|teradata/.test(name)) return 'SQL';\n  if (/salesforce/i.test(name)) return '';\n  if (/rest|soap|http|webservice|api|graphql|twitter|slack|telegram|jira|confluence|github|trello|sendgrid|twilio/.test(name)) return 'API';\n  if (/file|ftp|sftp|s3|google|drive|dropbox|onedrive|box|local|csv|excel|xml|json|parquet|avro|sharepoint|azure|blob/.test(name)) {\n    const isOutput = /output|put|create|write|insert|update|delete|send|upload|bulk/.test(name);\n    const isInput = /input|list|get|read|fetch|retrieve|extract|download/.test(name);\n    if (isOutput && !isInput) return 'FILE_OUTPUT';\n    return 'FILE_INPUT'; \n  }\n  if (/output|put|create|write|send|upload/.test(name)) return 'GENERIC_OUTPUT';\n  if (/input|list|get|read|fetch/.test(name)) return 'GENERIC_INPUT';\n  return 'OTHER';\n}\n\n// ============================================================\n// 🔄 PROCESS EACH INPUT ITEM\n// ============================================================\nfor (const item of $input.all()) {\n  const rawInput = item.json;\n  const unwrapped = Array.isArray(rawInput) ? rawInput[0] : rawInput;\n  const processType = unwrapped && unwrapped[\"talendfile:ProcessType\"]\n    ? unwrapped[\"talendfile:ProcessType\"] : unwrapped;\n\n  if (!processType) {\n    results.push({ json: { _debug: \"ProcessType not found\", keys: Object.keys(unwrapped || {}) } });\n    continue;\n  }\n\n  // 1. Get the filepath or filename from the input\n  const rawPath = rawInput.filePath || rawInput.fileName || rawInput.name || \"\";\n\n  // We trust that jobName is always provided from the previous nodes\n  let extractedJobName = rawInput.jobName || \"Unknown_Job\";\n  let talendVersion = rawInput.tmcVersion || rawInput.talendVersion || \"0.1.0\";\n\n  if (rawPath && rawPath.trim() !== \"\") {\n    const fileNameWithExt = rawPath.includes(\"/\") ? rawPath.split(\"/\").pop() : rawPath;\n    let cleanName = fileNameWithExt.replace(/\\.[^/.]+$/, \"\");\n    cleanName = cleanName.replace(/_\\d{6}-\\d{6}$/, \"\");\n    const nameFromPath = cleanName.replace(/_\\d+(?:\\.\\d+)*$/, \"\");\n    \n    if (nameFromPath && nameFromPath.trim() !== \"\") {\n      extractedJobName = nameFromPath;\n    }\n\n    if (!talendVersion || talendVersion === \"0.0.0\") {\n      const versionMatch = cleanName.match(/_(\\d+(?:\\.\\d+)+)$/);\n      if (versionMatch) {\n        talendVersion = versionMatch[1];\n      }\n    }\n  } else if (processType.name) {\n    const xmlName = processType.name;\n    const cleanXmlName = xmlName.replace(/_\\d{6}-\\d{6}$/, \"\").replace(/_\\d+(?:\\.\\d+)*$/, \"\");\n    if (cleanXmlName && cleanXmlName.trim() !== \"\") {\n      extractedJobName = cleanXmlName;\n    }\n  }\n\n  const allNodes = Array.isArray(processType.node) ? processType.node : [];\n  const rawConnections = Array.isArray(processType.connection) ? processType.connection : [];\n\n  // ============================================================\n  // 📥 INPUT & 📤 OUTPUT FILES\n  // ============================================================\n  const inputFiles = [];\n  const outputFiles = [];\n\n  for (const node of allNodes) {\n    const comp = node?.componentName || \"\";\n    const type = classifyComponent(comp);\n    \n    if (type === 'FILE_INPUT' || type === 'GENERIC_INPUT') {\n      const rawFileName = findDynamicParam(node, [\"FILENAME\", \"FILE\", \"PATH\", \"FOLDER\", \"DESTINATIONFOLDER\", \"BUCKET\", \"OBJECT\", \"URI\", \"URL\"]) || \"N/A\";\n      const folderPath = findDynamicParam(node, [\"FILEPATH\", \"DIRECTORY\", \"FOLDER\", \"PATH\", \"BUCKETNAME\", \"CONTAINER\"]) || \"N/A\";\n      const encoding = findDynamicParam(node, [\"ENCODING\", \"CHARSET\"]) || \"UTF-8\";\n      const format = findDynamicParam(node, [\"FORMAT\", \"TYPE\", \"EXTENSION\"]) || comp;\n      \n      let finalFileName = cleanFileName(rawFileName);\n      let finalFolderPath = folderPath;\n      if (finalFileName === \"N/A\" || finalFileName === \"(dynamic filename)\") {\n        const gDriveFolder = getGDriveProp(node, \"folder\") || getGDriveProp(node, \"destinationFolder\");\n        if (gDriveFolder) {\n          finalFileName = `Folder: ${gDriveFolder}`;\n          finalFolderPath = gDriveFolder;\n        }\n      }\n\n      inputFiles.push({ \n        parameter: getParam(node, \"UNIQUE_NAME\") || comp, \n        fileName: finalFileName, \n        format: format, \n        mo: \"M\", \n        encoding: encoding, \n        folderPath: finalFolderPath, \n        fileExample: \"\" \n      });\n    } \n    else if (type === 'FILE_OUTPUT' || type === 'GENERIC_OUTPUT') {\n      const rawFileName = findDynamicParam(node, [\"FILENAME\", \"FILE\", \"PATH\", \"FOLDER\", \"DESTINATIONFOLDER\", \"BUCKET\", \"OBJECT\", \"URI\", \"URL\"]) || \"N/A\";\n      const folderPath = findDynamicParam(node, [\"FILEPATH\", \"DIRECTORY\", \"FOLDER\", \"PATH\", \"BUCKETNAME\", \"CONTAINER\"]) || \"N/A\";\n      const encoding = findDynamicParam(node, [\"ENCODING\", \"CHARSET\"]) || \"UTF-8\";\n      const format = findDynamicParam(node, [\"FORMAT\", \"TYPE\", \"EXTENSION\"]) || comp;\n      \n      let finalFileName = cleanFileName(rawFileName);\n      let finalFolderPath = folderPath;\n      if (finalFileName === \"N/A\" || finalFileName === \"(dynamic filename)\") {\n        const gDriveFolder = getGDriveProp(node, \"folder\") || getGDriveProp(node, \"destinationFolder\") || getGDriveProp(node, \"newFolder\");\n        if (gDriveFolder) {\n          finalFileName = `Upload to: ${gDriveFolder}`;\n          finalFolderPath = gDriveFolder;\n        }\n      }\n\n      outputFiles.push({ \n        parameter: getParam(node, \"UNIQUE_NAME\") || comp, \n        fileName: finalFileName, \n        format: format, \n        mo: \"M\", \n        encoding: encoding, \n        folderPath: finalFolderPath, \n        fileExample: \"\" \n      });\n    }\n  }\n\n  // ============================================================\n  // 🗄️ SQL & SOQL REQUESTS\n  // ============================================================\n  const sqlRequests = [];\n  let sqlCounter = 1;\n  let soqlCounter = 1;\n\n  for (const node of allNodes) {\n    const comp = node?.componentName || \"\";\n    const type = classifyComponent(comp);\n    const label = getNodeLabel(node) || getParam(node, \"UNIQUE_NAME\") || comp;\n    \n    if (type === 'SQL') {\n      let sql = findDynamicParam(node, [\"QUERY\", \"SQL_QUERY\", \"QUERYSTORE\", \"SELECT_QUERY\", \"INSERT_QUERY\", \"UPDATE_QUERY\", \"DELETE_QUERY\"]);\n      if (sql && sql.trim() !== \"\" && sql !== \"N/A\" && !sql.includes(\"QUERYSTORE_TYPE\") && !sql.includes(\"[object Object]\")) {\n        sqlRequests.push({ id: `TSQL${sqlCounter++}`, description: label, sql: sql.trim() });\n      }\n    }\n    else if (type === 'SOQL') {\n      let soql = null;\n      const propParam = node.elementParameter?.find(p => p && p.name === \"PROPERTIES\");\n      if (propParam && propParam.value) {\n        let props = propParam.value;\n        if (typeof props === 'string') {\n          try { props = JSON.parse(props); } catch(e) { props = null; }\n        }\n        if (props && typeof props === 'object') {\n          let queryObj = props.query;\n          if (typeof queryObj === 'object' && queryObj !== null) soql = queryObj.storedValue;\n          else if (typeof queryObj === 'string') soql = queryObj;\n        }\n      }\n      if (!soql && Array.isArray(node.elementParameter)) {\n        for (const param of node.elementParameter) {\n          let val = param.value;\n          if (typeof val === 'object' && val !== null) val = val.storedValue;\n          if (typeof val === 'string' && val.toUpperCase().includes(\"SELECT\") && val.toUpperCase().includes(\"FROM\")) {\n            soql = val.replace(/^\"|\"$/g, '').trim();\n            break;\n          }\n        }\n      }\n      if (soql && typeof soql === 'string' && soql.trim() !== \"\" && soql !== \"N/A\" && !soql.includes(\"QUERYSTORE_TYPE\") && !soql.includes(\"@type\") && !soql.includes(\"[object Object]\")) {\n        let section = \"GENERAL\";\n        const labelLower = label.toLowerCase();\n        if (labelLower.includes(\"invoice\")) section = \"INVOICE\";\n        else if (labelLower.includes(\"return\") || labelLower.includes(\"credit\")) section = \"RETURN\";\n        else if (labelLower.includes(\"refund\")) section = \"REFUND\";\n        else if (labelLower.includes(\"payment\")) section = \"PAYMENT\";\n        else if (labelLower.includes(\"fulfillment\")) section = \"FULFILLMENT\";\n        sqlRequests.push({ id: `${section} SOQL${soqlCounter++}`, description: label, sql: soql.trim() });\n      }\n    }\n  }\n\n  // ============================================================\n  // 🌐 API REQUESTS\n  // ============================================================\n  const apiRequests = [];\n  for (const node of allNodes) {\n    const comp = node?.componentName || \"\";\n    const type = classifyComponent(comp);\n    if (type === 'API') {\n      const url = findDynamicParam(node, [\"URI\", \"URL\", \"ENDPOINT\", \"SERVICE_URL\", \"WSDL\", \"HOST\", \"BASE_URL\", \"URI_SERVICE\"]);\n      const method = findDynamicParam(node, [\"HTTP_METHOD\", \"METHOD\", \"VERB\", \"HTTP_VERB\", \"METHOD_HTTP\"]) || \"GET\";\n      let body = findDynamicParam(node, [\"BODY\", \"PAYLOAD\", \"REQUEST_BODY\", \"SOAP_MESSAGE\", \"BODY_JSON\", \"REQUEST_BODY_JSON\", \"ENTITY_BODY\", \"CONTENT\", \"MESSAGE\"]);\n      \n      if (!body) {\n        const propParam = node.elementParameter?.find(p => p && p.name === \"PROPERTIES\");\n        if (propParam && propParam.value) {\n          let props = propParam.value;\n          if (typeof props === 'string') { try { props = JSON.parse(props); } catch(e) { props = null; } }\n          if (props) body = props.body || props.payload || props.requestBody || props.content || props.data || props.message || props.soapMessage || \"\";\n        }\n      }\n      if (!body) {\n        const bodyParam = node.elementParameter?.find(p => p && p.name && (p.name.toUpperCase().includes(\"BODY\") || p.name.toUpperCase().includes(\"PAYLOAD\") || (p.name.toUpperCase().includes(\"REQUEST\") && p.name.toUpperCase().includes(\"BODY\"))));\n        if (bodyParam && bodyParam.value) body = String(bodyParam.value).replace(/^\"|\"$/g, '');\n      }\n\n      let headers = findDynamicParam(node, [\"HEADERS\", \"HTTP_HEADERS\", \"HEADER\", \"CUSTOM_HEADERS\"]);\n      if (!headers || headers === \"{}\") {\n        const propParam = node.elementParameter?.find(p => p && p.name === \"PROPERTIES\");\n        if (propParam && propParam.value) {\n          let props = propParam.value;\n          if (typeof props === 'string') { try { props = JSON.parse(props); } catch(e) { props = null; } }\n          if (props) headers = props.headers || props.httpHeaders || props.customHeaders || props.requestHeaders || \"{}\";\n        }\n      }\n      if (!headers || headers === \"{}\") {\n        const headerParam = node.elementParameter?.find(p => p && p.name && (p.name.toUpperCase().includes(\"HEADER\") || p.name.toUpperCase().includes(\"HTTP_HEADER\")));\n        if (headerParam && headerParam.value) headers = String(headerParam.value).replace(/^\"|\"$/g, '');\n      }\n      \n      let queryParams = findDynamicParam(node, [\"QUERY_PARAMETERS\", \"QUERY_PARAMS\", \"PARAMS\", \"QUERY\"]);\n      if (!queryParams || queryParams === \"{}\") {\n        const propParam = node.elementParameter?.find(p => p && p.name === \"PROPERTIES\");\n        if (propParam && propParam.value) {\n          let props = propParam.value;\n          if (typeof props === 'string') { try { props = JSON.parse(props); } catch(e) { props = null; } }\n          if (props) queryParams = props.queryParams || props.queryParameters || props.params || props.parameters || props.query || \"{}\";\n        }\n      }\n      \n      apiRequests.push({ requestName: getParam(node, \"UNIQUE_NAME\") || comp, method: method, url: url || \"N/A\", body: body || \"\", headers: headers || \"{}\", queryParams: queryParams || \"{}\" });\n    }\n  }\n\n  // ============================================================\n  // ️ MAPPING EXTRACTION\n  // ============================================================\n  const mappingTables = [];\n  for (const node of allNodes) {\n    const comp = node?.componentName || \"\";\n    if (/tMap/i.test(comp)) {\n      const mapName = getParam(node, \"UNIQUE_NAME\") || comp;\n      const sourceConnections = rawConnections\n        .filter(c => c.target === mapName && /MAIN|FLOW/i.test(c.connectorName || \"\"))\n        .map(c => ({ source: c.source.replace(/_\\d+$/, \"\"), connectorName: c.connectorName || \"MAIN\", label: getNodeLabel(allNodes.find(n => (n.componentName || \"\") === c.source.replace(/_\\d+$/, \"\"))) }));\n      \n      const destinations = rawConnections\n        .filter(c => c.source === mapName && /MAIN|FLOW/i.test(c.connectorName || \"\"))\n        .map(c => c.target.replace(/_\\d+$/, \"\"));\n      \n      let fieldMappings = [];\n      const nodeData = node.nodeData;\n      if (nodeData) {\n        let outputTablesStr = nodeData.outputTables;\n        let outputTables = null;\n        if (typeof outputTablesStr === 'string') { try { outputTables = JSON.parse(outputTablesStr); } catch(e) {} }\n        else if (typeof outputTablesStr === 'object') { outputTables = outputTablesStr; }\n        \n        if (outputTables) {\n          const outputs = Array.isArray(outputTables) ? outputTables : [outputTables];\n          for (const out of outputs) {\n            const entries = out.mapperTableEntries;\n            const tableEntries = Array.isArray(entries) ? entries : (entries ? [entries] : []);\n            for (const entry of tableEntries) {\n              const fieldName = entry.name || \"\";\n              const fieldType = (entry.type || \"\").replace(\"id_\", \"\");\n              const expression = entry.expression || \"Direct Mapping\";\n              let srcField = fieldName;\n              let srcComp = sourceConnections[0]?.source || \"Input\";\n              let srcLabel = sourceConnections[0]?.label;\n              \n              const rowMatch = String(expression).match(/(\\w+)\\.(\\w+)/);\n              if (rowMatch) {\n                const rowVar = rowMatch[1];\n                srcField = rowMatch[2];\n                const connectorIndex = parseInt(rowVar.replace(/\\D/g, '')) || 0;\n                if (connectorIndex === 0) { srcComp = sourceConnections[0]?.source || \"Input\"; srcLabel = sourceConnections[0]?.label; } \n                else if (sourceConnections[connectorIndex]) { srcComp = sourceConnections[connectorIndex].source; srcLabel = sourceConnections[connectorIndex].label; }\n              }\n              const cleanSrcLabel = srcLabel ? String(srcLabel).trim() : \"\";\n              const finalSrcComp = cleanSrcLabel ? `${srcComp}-${cleanSrcLabel}` : srcComp;\n              fieldMappings.push({ srcComp: finalSrcComp, srcField: srcField, srcType: fieldType, destComp: destinations.join(\", \") || \"Output\", destField: fieldName, destType: fieldType, rule: String(expression).replace(/\\|/g, \"\\\\|\").replace(/\\n/g, \" \") });\n            }\n          }\n        }\n      }\n      \n      if (fieldMappings.length === 0) {\n        const baseSrcComp = sourceConnections[0]?.source || \"Input\";\n        const baseSrcLabel = sourceConnections[0]?.label;\n        const cleanSrcLabel = baseSrcLabel ? String(baseSrcLabel).trim() : \"\";\n        const finalSrcComp = cleanSrcLabel ? `${baseSrcComp}-${cleanSrcLabel}` : baseSrcComp;\n        fieldMappings.push({ srcComp: finalSrcComp, srcField: \"*\", srcType: \"-\", destComp: destinations.join(\", \") || \"Output\", destField: \"*\", destType: \"-\", rule: \"See Talend Job (Expressions not extracted)\" });\n      }\n      mappingTables.push({ mapName, rows: fieldMappings });\n    }\n  }\n\n  // ============================================================\n  // ⚙️ JOB PARAMS & INTRODUCTION\n  // ============================================================\n  const jobParams = [];\n  const contexts = Array.isArray(processType.context) ? processType.context : [];\n  const defaultContext = contexts.find(c => c.name === \"Default\") || contexts[0];\n  const contextParams = Array.isArray(defaultContext?.contextParameter) ? defaultContext.contextParameter : [];\n\n  for (const p of contextParams) {\n    const val = p?.value || \"\";\n    if (val.startsWith(\"enc:system.encryption\") || val === \"\" || val === '\"\"') continue;\n    jobParams.push({ parameterName: p?.name || \"Unknown\", description: p?.comment || \"\", type: (p?.type || \"id_String\").replace(\"id_\", \"\"), value: String(val).replace(/^\"|\"$/g, '') });\n  }\n\n  const hasInput = inputFiles.length > 0 || apiRequests.length > 0;\n  const hasOutput = outputFiles.length > 0;\n  const hasTransform = allNodes.some(n => /tMap|tAggregate|tFilter|tSort/i.test(n.componentName || \"\"));\n\n  let introSentence = \"This Talend job performs an integration task.\";\n  if (hasInput && hasOutput && hasTransform) introSentence = \"This Talend job orchestrates data extraction from source systems, applies necessary transformations, and loads the processed data into target destinations.\";\n  else if (hasInput && hasOutput) introSentence = \"This Talend job orchestrates data extraction from source systems and loads the processed data into target destinations.\";\n  else if (hasInput) introSentence = \"This Talend job extracts data from source systems for processing.\";\n  else if (hasOutput) introSentence = \"This Talend job loads data into target systems.\";\n\n  const introduction = { jobName: extractedJobName, author: processType.author || \"N/A\", creationDate: processType.creationDate || \"N/A\", purpose: introSentence };\n\n  // ============================================================\n  // 🔗 ENDPOINTS EXTRACTION\n  // ============================================================\n  const endpoints = [];\n  for (const param of jobParams) {\n    const name = param.parameterName.toLowerCase();\n    if (name.includes(\"url\") || name.includes(\"endpoint\") || name.includes(\"host\")) {\n      let service = \"Unknown\", environment = \"Unknown\";\n      if (name.includes(\"salesforce\")) service = \"Salesforce\";\n      else if (name.includes(\"synapse\") || name.includes(\"azure\")) service = \"Azure Synapse\";\n      else if (name.includes(\"ftp\")) service = \"FTP\";\n      else if (name.includes(\"smtp\") || name.includes(\"mail\")) service = \"SMTP\";\n      else if (name.includes(\"api\")) service = \"REST API\";\n      \n      if (name.includes(\"dev\") || name.includes(\"test\")) environment = \"Development\";\n      else if (name.includes(\"prod\")) environment = \"Production\";\n      else if (name.includes(\"int\") || name.includes(\"integ\")) environment = \"Integration\";\n      else if (name.includes(\"loc\")) environment = \"Local\";\n      endpoints.push({ service, environment, port: \"\", url: param.value });\n    }\n  }\n\n  const uniqueEndpoints = [];\n  const seen = new Set();\n  for (const ep of endpoints) {\n    const key = `${ep.service}-${ep.url}`;\n    if (!seen.has(key)) { seen.add(key); uniqueEndpoints.push(ep); }\n  }\n\n  // ============================================================\n  // ✅ BUILD RESULT FOR THIS ITEM\n  // ============================================================\n  const isNewVersion = rawInput.isNewVersion !== false && String(rawInput.isNewVersion).toLowerCase() !== 'false';\n  const commitMsg = rawInput.commitMsg || \"\";\n\n  const result = { \n    introduction,\n    JobName: extractedJobName,      \n    talendVersion: talendVersion,            \n    pageTitle: `${extractedJobName} - Integration Specification`, \n    isNewVersion,\n    commitMsg,\n    _debug: { rawFileName: rawPath, processTypeName: processType.name } \n  };\n  if (inputFiles.length > 0) result.inputs = { file: inputFiles };\n  if (outputFiles.length > 0) result.outputs = { file: outputFiles };\n  if (sqlRequests.length > 0) result.sqlRequests = sqlRequests;\n  if (apiRequests.length > 0) result.apiRequests = apiRequests;\n  if (mappingTables.length > 0) result.mappings = mappingTables;\n  if (jobParams.length > 0) result.jobParams = jobParams;\n  if (uniqueEndpoints.length > 0) result.endpoints = uniqueEndpoints;\n  if (rawConnections.length > 0) result.connections = rawConnections;\n  if (allNodes.length > 0) result.nodes = allNodes.map(n => ({ uniqueName: getParam(n, \"UNIQUE_NAME\") || n.componentName, componentName: n.componentName || \"\" }));\n\n  results.push({ json: result });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28176,
+        14144
+      ],
+      "id": "19b67716-e99f-4b7c-b5e7-53235a3ca1af",
+      "name": "Code in JavaScript",
+      "notes": "extract input , output and job params from json\n->Mapper"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "JobName",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        29456,
+        14176
+      ],
+      "id": "8cb9f22c-eaec-4780-8e4a-c7edb43a14df",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.filePath }}",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        29744,
+        13424
+      ],
+      "id": "afc4483f-38e8-4644-b9a4-ebba0cc2bfdc",
+      "name": "Read/Write Files from Disk3",
+      "retryOnFail": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the input item and data from the previous LLM node\nconst item = $input.first();\nconst data = item.json;\n\n// 2. Extract Job Name safely\nconst jobName = $input.first().json.JobName || data.jobName || \"Unknown Job\";\n\n// 3. Create a timestamp\nconst timestamp = new Date().toISOString();\n\n// 4. Determine if it's an error or success\n// Checks for n8n's native error object (if \"On Error\" is set to \"Continue\") \n// OR an error object returned directly in the API JSON response\nconst hasError = item.error || data.error;\n\nlet logLine = \"\";\n\nif (hasError) {\n  // Extract a concise error message\n  const errMsg = item.error?.message || data.error?.message || (typeof data.error === 'string' ? data.error : JSON.stringify(data).substring(0, 150));\n  logLine = `[${timestamp}] [LLM_ERROR] Details: ${errMsg}\\n`;\n} else {\n  // Success \n  //removed the Job: \"${jobName}\" i can add it but it will need another edit field node and same for the error logs\n  logLine = `[${timestamp}] [LLM_SUCCESS] \\n`;\n}\n\n// 5. Create buffer and return\nconst buffer = Buffer.from(logLine, 'utf-8');\n\nreturn [{ \n  json: { \n    filePath: \"/home/node/.n8n-files/n8n_workflow.log\" \n  },\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'n8n_workflow.log'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29424,
+        13424
+      ],
+      "id": "3d30c256-5cb6-4c07-b20d-2c4012d1ec57",
+      "name": "Code in JavaScript17"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "yyGvvrtSDroKoLFd",
+          "mode": "list",
+          "cachedResultName": "MigrationTable",
+          "cachedResultUrl": "/projects/sYkaWXZanX1rZ4n5/datatables/yyGvvrtSDroKoLFd"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "jobName",
+              "keyValue": "={{ $json.JobName }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        29520,
+        14592
+      ],
+      "id": "986d5f5e-8b2f-460c-a779-2edac902ffa1",
+      "name": "Get row(s)",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7abf1890-ea1e-4a81-a644-2ed49688b178",
+              "leftValue": "={{ $json.pageExists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        30928,
+        14192
+      ],
+      "id": "0d703d84-0a86-4322-92de-b3a51175d748",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://ahmedmessoudi.atlassian.net/wiki/rest/api/content/{{ $json.confluencePageId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"id\": \"{{ $json.confluencePageId }}\",\n  \"type\": \"page\",\n  \"title\": \"{{ $json.pageTitle }}\",\n  \"space\": {\n    \"key\": \"Test\"\n  },\n  \"body\": {\n    \"storage\": {\n      \"value\": {{ JSON.stringify($json.confluenceHtml || \"\") }},\n      \"representation\": \"storage\"\n    }\n  },\n  \"version\": {\n    \"number\": {{ $json.version.number + 1}},\n    \"message\": \"Synced with Talend version {{ $json.talendVersion }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        31808,
+        13840
+      ],
+      "id": "db07c3c0-a617-4b7f-8482-744c6f214034",
+      "name": "HTTP Request3",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "rfsEyMLkr3h7TyW1",
+          "name": "Unnamed credential"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "yyGvvrtSDroKoLFd",
+          "mode": "list",
+          "cachedResultName": "MigrationTable",
+          "cachedResultUrl": "/projects/sYkaWXZanX1rZ4n5/datatables/yyGvvrtSDroKoLFd"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "jobName",
+              "keyValue": "={{ $json.extractedJobName }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "confluenceVersion": "={{ $json.confluenceVersion + 1 }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "jobName",
+              "displayName": "jobName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "talendVersion",
+              "displayName": "talendVersion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "confluencePageId",
+              "displayName": "confluencePageId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "confluenceVersion",
+              "displayName": "confluenceVersion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        32608,
+        14080
+      ],
+      "id": "962c5737-af40-4dfd-a7a5-928d764a91ad",
+      "name": "Update row(s)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ahmedmessoudi.atlassian.net/wiki/rest/api/content",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"page\",\n  \"title\": \"{{ $json.pageTitle }}\",\n  \"space\": {\n    \"key\": \"Test\"\n  },\n  \"ancestors\": [\n    {\n      \"id\": \"{{ $('Config').item.json.targetFolderId }}\"\n    }\n  ],\n  \"body\": {\n    \"storage\": {\n      \"value\": {{ JSON.stringify($json.confluenceHtml || \"\") }},\n      \"representation\": \"storage\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        31312,
+        14608
+      ],
+      "id": "0897fb18-2ee2-4d31-8ab7-6cc54aa5fecb",
+      "name": "HTTP Request4",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "rfsEyMLkr3h7TyW1",
+          "name": "Unnamed credential"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "yyGvvrtSDroKoLFd",
+          "mode": "list",
+          "cachedResultName": "MigrationTable",
+          "cachedResultUrl": "/projects/sYkaWXZanX1rZ4n5/datatables/yyGvvrtSDroKoLFd"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobName": "={{ $json.extractedJobName}}",
+            "confluencePageId": "={{ $json.id }}",
+            "confluenceVersion": "={{ $json.confluenceVersion }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "jobName",
+              "displayName": "jobName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "talendVersion",
+              "displayName": "talendVersion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "confluencePageId",
+              "displayName": "confluencePageId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "confluenceVersion",
+              "displayName": "confluenceVersion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        32128,
+        14320
+      ],
+      "id": "308d6119-eebd-4379-8385-91a03f6d8c38",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        30368,
+        14192
+      ],
+      "id": "7df55ddc-5973-4cc0-803d-20a68d43b709",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.filePath }}",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        32608,
+        13824
+      ],
+      "id": "6db8a106-2a81-43ca-8bec-7292ccd72bc3",
+      "name": "Read/Write Files from Disk5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the input item and data from the previous Confluence HTTP Request node\nconst item = $input.first();\nconst data = item.json;\n\n// 2. Extract Job Name from the page title (e.g., \"MyJob - Integration Specification\" -> \"MyJob\")\nconst pageTitle = data.title || data.content?.title || \"Unknown Title\";\nconst jobNameMatch = pageTitle.match(/^(.+?)\\s*-\\s*Integration Specification$/i);\nconst jobName = jobNameMatch ? jobNameMatch[1].trim() : \"Unknown Job\";\n\n// 3. Create a timestamp\nconst timestamp = new Date().toISOString();\n\n// 4. Determine if it's an error or success\nconst hasError = item.error || data.error;\n\nlet logLine = \"\";\n\nif (hasError) {\n  // Extract a concise error message\n  const statusCode = data.statusCode || data.status || item.error?.status || \"Unknown\";\n  const errMsg = item.error?.message || data.error?.message || data.message || (typeof data.error === 'string' ? data.error : JSON.stringify(data).substring(0, 150));\n  logLine = `[${timestamp}] [CONFLUENCE_PAGE_UPDATE_ERROR] Job: \"${jobName}\" | Status: ${statusCode} | Details: ${errMsg}\\n`;\n} else {\n  // Success\n  const statusCode = data.statusCode || data.status || \"200\";\n  const pageId = data.id || data.content?.id || \"N/A\";\n  logLine = `[${timestamp}] [CONFLUENCE_PAGE_UPDATED_SUCCESS] Job: \"${jobName}\" | Status: ${statusCode} | PageID: ${pageId} | Title: \"${pageTitle}\"\\n`;\n}\n\nconst buffer = Buffer.from(logLine, 'utf-8');\n\n// 5. Return the formatted string and the target file path\nreturn [{ \n  json: { \n    filePath: \"/home/node/.n8n-files/n8n_workflow.log\" \n  },\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'n8n_workflow.log'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        32192,
+        13824
+      ],
+      "id": "9fcedf99-0bbd-49b3-a095-9d44d412208c",
+      "name": "Code in JavaScript20"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.filePath }}",
+        "options": {
+          "append": true
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        32112,
+        14608
+      ],
+      "id": "81e9754b-3ac5-44ae-9b17-d23e1039602c",
+      "name": "Read/Write Files from Disk6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the input item and data from the previous Confluence HTTP Request node\nconst item = $input.first();\nconst data = item.json;\n\n// 2. Extract Job Name from the page title (e.g., \"MyJob - Integration Specification\" -> \"MyJob\")\nconst pageTitle = data.title || data.content?.title || \"Unknown Title\";\nconst jobNameMatch = pageTitle.match(/^(.+?)\\s*-\\s*Integration Specification$/i);\n//const jobName = jobNameMatch ? jobNameMatch[1].trim() : \"Unknown Job\";\nconst jobName = data.title;\n\n// 3. Create a timestamp\nconst timestamp = new Date().toISOString();\n\n// 4. Determine if it's an error or success\nconst hasError = item.error || data.error;\n\nlet logLine = \"\";\n\nif (hasError) {\n  // Extract a concise error message\n  const statusCode = data.statusCode || data.status || item.error?.status || \"Unknown\";\n  const errMsg = item.error?.message || data.error?.message || data.message || (typeof data.error === 'string' ? data.error : JSON.stringify(data).substring(0, 150));\n  logLine = `[${timestamp}] [CONFLUENCE_PAGE_CREATE_ERROR] Job: \"${jobName}\" | Status: ${statusCode} | Details: ${errMsg}\\n`;\n} else {\n  // Success\n  const statusCode = data.statusCode || data.status || \"200\";\n  const pageId = data.id || data.content?.id || \"N/A\";\n  logLine = `[${timestamp}] [CONFLUENCE_PAGE_CREATED_SUCCESS] Job: \"${jobName}\" | Status: ${statusCode} | PageID: ${pageId} | Title: \"${pageTitle}\"\\n`;\n}\n\nconst buffer = Buffer.from(logLine, 'utf-8');\n\n// 5. Return the formatted string and the target file path\nreturn [{ \n  json: { \n    filePath: \"/home/node/.n8n-files/n8n_workflow.log\" \n  },\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'text/plain',\n      fileName: 'n8n_workflow.log'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        31712,
+        14608
+      ],
+      "id": "1cdf5aa3-f12f-442c-82e2-ef5f05559ed3",
+      "name": "Code in JavaScript21"
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "yyGvvrtSDroKoLFd",
+          "mode": "list",
+          "cachedResultName": "MigrationTable",
+          "cachedResultUrl": "/projects/sYkaWXZanX1rZ4n5/datatables/yyGvvrtSDroKoLFd"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "jobName",
+              "keyValue": "j00_som_ftpJacquemus_jxx"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        30912,
+        14960
+      ],
+      "id": "4e89f044-05ba-4d88-abab-160414c5d109",
+      "name": "Delete row(s)"
+    },
+    {
+      "parameters": {
+        "resource": "table",
+        "operation": "delete",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Zz4ygVtjkc7wEavg",
+          "mode": "list",
+          "cachedResultName": "MigrationTable",
+          "cachedResultUrl": "/projects/sYkaWXZanX1rZ4n5/datatables/Zz4ygVtjkc7wEavg"
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        31280,
+        14960
+      ],
+      "id": "08696859-abd5-4a9c-8d3b-c97b62d369be",
+      "name": "Delete a data table1"
+    },
+    {
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "MigrationTable",
+        "columns": {
+          "column": [
+            {
+              "name": "jobName"
+            },
+            {
+              "name": "confluencePageId",
+              "type": "number"
+            },
+            {
+              "name": "confluenceVersion",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        30912,
+        15216
+      ],
+      "id": "2541af9f-ad15-49be-815d-853e409fcd29",
+      "name": "Create a data table"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\n\n// Separate the stacked items into HTML payloads and DB payloads\nconst htmlItems = items.filter(i => i.json.confluenceHtml !== undefined || i.json.pageTitle !== undefined);\nconst dbItems = items.filter(i => i.json.confluenceHtml === undefined && i.json.pageTitle === undefined);\n\n// Loop through each HTML job and find its matching DB row by Job Name\nfor (const htmlItem of htmlItems) {\n  const htmlData = htmlItem.json;\n  const jobName = htmlData.extractedJobName || htmlData.jobName;\n  \n  // Match the DB row dynamically (No more relying on array index positions!)\n  const dbMatch = dbItems.find(d => (d.json.extractedJobName || d.json.jobName) === jobName);\n  const dbData = dbMatch ? dbMatch.json : {};\n\n  results.push({\n    json: {\n      // Spread all the NEW metadata first (includes the correct talendVersion, jobName, pageTitle, etc.)\n      ...htmlData,\n\n      confluencePageId: dbData.confluencePageId || null,\n      confluenceVersion: dbData.confluenceVersion || 1,\n      //dbData: dbData,\n\n      pageExists: (typeof dbData.confluencePageId === 'number' && dbData.confluencePageId > 0)\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        30656,
+        14192
+      ],
+      "id": "afdb66cd-c9ce-4a1c-956b-3fa225081f68",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "url": "=https://raw.githubusercontent.com/{{ $json.repoFullName }}/{{ $json.branch }}/{{ $json.filePath }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        27056,
+        14144
+      ],
+      "id": "5a630def-d2d3-41e6-aab2-fd2da53558ae",
+      "name": "HTTP Request2",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "FgLinQrr4ZVyD5m3",
+          "name": "Unnamed credential 3"
+        },
+        "githubApi": {
+          "id": "6J9lNMOILGDrZr2T",
+          "name": "GitHub account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f3279192-5a85-4c42-b6f1-f50c6e0044d5",
+              "name": "jobName",
+              "value": "={{ $('Extract & Match Job Files').item.json.jobName }}",
+              "type": "string"
+            },
+            {
+              "id": "0775572c-7b08-4e8e-93c1-389e05497e4a",
+              "name": "tmcVersion",
+              "value": "={{ $('Extract & Match Job Files').item.json.talendVersion }}",
+              "type": "string"
+            },
+            {
+              "id": "9f8e7d6c-5b4a-4392-8c1d-2e3f4a5b6c7d",
+              "name": "isNewVersion",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "1a2b3c4d-5e6f-4708-9a0b-1c2d3e4f5a6b",
+              "name": "commitMsg",
+              "value": "={{ $('Extract & Match Job Files').item.json.commitMsg }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        27680,
+        14144
+      ],
+      "id": "3cac5dc5-c21b-4ea3-b066-e4b54219b2a1",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7bc4e89c-1aeb-46ec-88f7-f3a4e42901c3",
+              "name": "extractedJobName",
+              "value": "={{ $('If').item.json.extractedJobName }}",
+              "type": "string"
+            },
+            {
+              "id": "c39620b5-f6fa-4082-a50b-d8e668719b5c",
+              "name": "talendVersion",
+              "value": "={{ $('If').item.json.talendVersion }}",
+              "type": "string"
+            },
+            {
+              "id": "18237cd0-9e93-48b2-adfd-1e8b470e93ee",
+              "name": "confluencePageId",
+              "value": "={{ $json.space.id }}",
+              "type": "string"
+            },
+            {
+              "id": "5d6d7b29-72be-490f-b005-3eebddaa8d55",
+              "name": "confluenceVersion",
+              "value": "={{ $('If').item.json.confluenceVersion }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        31728,
+        14320
+      ],
+      "id": "3b8be80f-3ec8-4bab-b665-1d00e29d97a1",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7bc4e89c-1aeb-46ec-88f7-f3a4e42901c3",
+              "name": "extractedJobName",
+              "value": "={{ $('If').item.json.extractedJobName }}",
+              "type": "string"
+            },
+            {
+              "id": "c39620b5-f6fa-4082-a50b-d8e668719b5c",
+              "name": "talendVersion",
+              "value": "={{ $('If').item.json.talendVersion }}",
+              "type": "string"
+            },
+            {
+              "id": "18237cd0-9e93-48b2-adfd-1e8b470e93ee",
+              "name": "confluencePageId",
+              "value": "={{ $('If').item.json.confluencePageId }}",
+              "type": "string"
+            },
+            {
+              "id": "5d6d7b29-72be-490f-b005-3eebddaa8d55",
+              "name": "confluenceVersion",
+              "value": "={{ $('Edit Fields3').item.json.version.number }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        32192,
+        14080
+      ],
+      "id": "03c8e25b-976e-4700-8b8e-82ae84c32d36",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "url": "=https://ahmedmessoudi.atlassian.net/wiki/rest/api/content/{{ $json.confluencePageId }}?expand=version",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        31312,
+        13840
+      ],
+      "id": "7bfee730-8657-4824-8982-9846919ff324",
+      "name": "HTTP Request7",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "rfsEyMLkr3h7TyW1",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b6e659ad-afa6-4777-a388-8c15e6d77e2d",
+              "name": "confluenceHtml",
+              "value": "={{ $('If').item.json.confluenceHtml }}",
+              "type": "string"
+            },
+            {
+              "id": "f546f415-094a-41e6-b44b-6ee69e7ff8ec",
+              "name": "pageTitle",
+              "value": "={{ $('If').item.json.pageTitle }}",
+              "type": "string"
+            },
+            {
+              "id": "f0ab6d9b-92af-4546-aca3-2d5edf59afaf",
+              "name": "extractedJobName",
+              "value": "={{ $('If').item.json.extractedJobName }}",
+              "type": "string"
+            },
+            {
+              "id": "658575c2-150e-4716-82f6-626ecf64f570",
+              "name": "confluencePageId",
+              "value": "={{ $('If').item.json.confluencePageId }}",
+              "type": "number"
+            },
+            {
+              "id": "9467c82e-49ad-43de-91f0-ef2567334679",
+              "name": "talendVersion",
+              "value": "={{ $('If').item.json.talendVersion }}",
+              "type": "string"
+            },
+            {
+              "id": "e1d3de7b-6b34-40be-a161-7d89b9e10886",
+              "name": "version.number",
+              "value": "={{ $json.version.number }}",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        31552,
+        13840
+      ],
+      "id": "7118f3e2-196c-45f8-b2af-034fa1d6b731",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3.6-27b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        28944,
+        13952
+      ],
+      "id": "0c4f936e-dce2-465c-b863-65985aeaeb09",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "UVeTQfeRSQL2HsHb",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an expert ETL Data Architect. Analyze the provided Talend job structure and generate a Mermaid.js sequence diagram (starting with \\`sequenceDiagram\\`) that visualizes the **data pipeline and system interactions**.  Strict Guidelines: 1. Focus on the actual data flow (sources, transformations, targets, APIs). 2. Abstract and group similar components into logical participants. 3. Ignore utility, logging, and configuration components (e.g., tJava, tSetGlobalVar, tJobLog, tContextLoad) unless they represent a critical external action. 4. Ensure the diagram clearly shows the sequence of data extraction, processing, and loading. 5. Output ONLY the raw Mermaid.js code. Do not include markdown formatting (\\`\\`\\`mermaid), explanations, or any other text. "
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "Generate the mermaid sequence diagram for this job (NOTE : only the mermaid code in output):  {simplified}"
+            }
+          ]
+        },
+        "batching": {
+          "batchSize": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        28944,
+        13648
+      ],
+      "id": "78d5f7a9-8c0e-4a19-be8a-0cc2fbc662c7",
+      "name": "Basic LLM Chain",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepares each job's data for the Basic LLM Chain node (Groq via LangChain).\n// Same trimming logic as the old Code in JavaScript7 node, minus the manual\n// Groq request body - model, system prompt and batching (3 at a time) are\n// now configured directly on the Basic LLM Chain / Groq Chat Model nodes.\nconst results = [];\n\nfor (const item of $input.all()) {\n  const jobData = item.json;\n  const nodes = jobData.nodes || [];\n  const connections = jobData.connections || [];\n\n  const MAX_NODES = 60;\n  const MAX_CONNECTIONS = 80;\n  const trimmedNodes = nodes.slice(0, MAX_NODES);\n  const trimmedConnections = connections.slice(0, MAX_CONNECTIONS);\n  const wasTrimmed = nodes.length > MAX_NODES || connections.length > MAX_CONNECTIONS;\n\n  const simplified = {\n    jobName: jobData.introduction?.jobName || \"Unknown Job\",\n    nodes: trimmedNodes.map(n => ({ id: n.uniqueName, type: n.componentName })),\n    connections: trimmedConnections.map(c => ({\n      from: c.source,\n      to: c.target,\n      flow: c.connectorName\n    })),\n    ...(wasTrimmed ? { note: \"Job structure truncated for size - diagram may be incomplete for very large jobs.\" } : {})\n  };\n\n  results.push({\n    json: {\n      JobName : jobData.JobName, \n      chatInput: JSON.stringify(simplified)\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        28656,
+        13648
+      ],
+      "id": "b266e01b-577c-4a71-8080-a020696709ba",
+      "name": "Build LLM Prompt Input"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The Basic LLM Chain node's output field name has changed across n8n\n// versions ($json.text vs $json.response.text) - check known shapes defensively.\nconst results = [];\nconst items = $input.all();\n\nfor (let i = 0; i < items.length; i++) {\n  const data = items[i].json;\n  const raw = String(data.text ?? data.response?.text ?? data.output ?? '');\n  let jobName;\n  try {\n    jobName = $('Build LLM Prompt Input').itemMatching(i).json.JobName;\n  } catch (e) {\n    jobName = $('Build LLM Prompt Input').all()[i]?.json?.JobName;\n  }\n\n  const hasOpenThink = /<think>/i.test(raw);\n  const hasCloseThink = /<\\/think>/i.test(raw);\n\n  let diagram = '';\n  let diagramFailed = false;\n  let diagramFailReason = '';\n\n  if (hasOpenThink && !hasCloseThink) {\n    // Reasoning never finished - the response was truncated mid-thought\n    // (ran out of max_tokens before Qwen got to the actual answer). Anything\n    // matching \"sequenceDiagram\" in here is just draft text from inside the\n    // unfinished reasoning, not a real diagram, so don't try to salvage it.\n    diagramFailed = true;\n    diagramFailReason = 'Response truncated during reasoning (no closing </think> tag) - no diagram was produced.';\n  } else {\n    // Either there's no <think> block at all, or it's fully closed - safe\n    // to strip it and only search the text that comes AFTER it.\n    const afterThink = raw.replace(/<think>[\\s\\S]*?<\\/think>/gi, '').trim();\n    const match = afterThink.match(/sequenceDiagram[\\s\\S]*/i);\n\n    if (match) {\n      diagram = match[0]\n        .replace(/^```(?:mermaid)?\\s*/i, '')\n        .replace(/```\\s*$/, '')\n        .trim();\n    } else {\n      diagramFailed = true;\n      diagramFailReason = 'No \"sequenceDiagram\" found in the model output after removing reasoning.';\n    }\n  }\n\n  results.push({\n    json: {\n      llmDiagram: diagram,\n      diagramFailed,\n      diagramFailReason,\n      // itemMatching (not .item) - guarantees the right job's name even if\n      // the chain's batching returns results out of input order.\n      JobName: jobName\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29504,
+        13632
+      ],
+      "id": "3d93cf4c-92e2-40b3-87bd-1447910cac25",
+      "name": "Extract Diagram From Chain"
+    },
+    {
+      "parameters": {
+        "model": "cohere/north-mini-code:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        28784,
+        13920
+      ],
+      "id": "e506a0a0-c0b6-4185-b705-b8d54a35049d",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "lJd5msComjR3wEzL",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "qwen3.6-plus",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAlibabaCloud",
+      "typeVersion": 1,
+      "position": [
+        29184,
+        13936
+      ],
+      "id": "38b74020-0b38-4ffa-8e98-04017cf4d461",
+      "name": "Qwen Cloud Chat Model",
+      "credentials": {
+        "alibabaCloudApi": {
+          "id": "fkMAFIJqgO6zW2QH",
+          "name": "Qwen Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "### TO-DO\n\n## Make a decision on what model to use",
+        "height": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        28208,
+        13680
+      ],
+      "id": "15f0346a-4466-476a-8c71-f5f63b02bb13",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\nfunction compareVersions(v1, v2) {\n  const p1 = String(v1).split('.').map(Number);\n  const p2 = String(v2).split('.').map(Number);\n  for (let i = 0; i < 3; i++) {\n    if ((p1[i] || 0) > (p2[i] || 0)) return 1;\n    if ((p1[i] || 0) < (p2[i] || 0)) return -1;\n  }\n  return 0;\n}\n\n// --- Step 1: extract job names from the Confluence folder's page listing ---\n// v2 folder direct-children returns a flat mix of content types\n// (page, folder, whiteboard, ...). We only want the job pages.\nconst cfg = $('Config').first().json;\nconst item = $input.first();\nconst children = item.json.results || [];\n\nconst pages = children.filter(c => c.type === 'page');\n\nconst jobs = [];\nfor (const page of pages) {\n  const title = page.title || '';\n  const match = title.match(/^(.+?)\\s*-\\s*Integration Specification$/i);\n  let jobName = match ? match[1].trim() : title.trim();\n  // Strip a leading bracketed tag like '[job sync test j00] ' that's\n  // sometimes prefixed onto the page title but isn't part of the real job name.\n  jobName = jobName.replace(/^\\[[^\\]]*\\]\\s*/, '').trim();\n  if (!jobName) continue;\n  jobs.push({\n    jobName,\n    sourceTitle: title,\n    confluencePageId: page.id,\n    branch: cfg.branch,\n    githubOwner: cfg.githubOwner,\n    githubRepo: cfg.githubRepo\n  });\n}\n\nif (jobs.length === 0) {\n  throw new Error('No job pages were found directly under this Confluence folder (id ' + cfg.sourceFolderId + ').');\n}\n\n// --- Step 2: match each job to its latest .item file in the GitHub tree ---\n// Reuses the same filename convention as the push-trigger workflow:\n//   <jobName>_<version>[_<timestamp>].item under a /process/ folder\nconst treeResp = $('GitHub: Get Repo Tree').first().json;\nconst tree = Array.isArray(treeResp.tree) ? treeResp.tree : [];\n\nconst itemFiles = tree.filter(t =>\n  t.type === 'blob' &&\n  typeof t.path === 'string' &&\n  t.path.toLowerCase().endsWith('.item') &&\n  t.path.includes('/process/')\n);\n\nconst results = [];\n\nfor (const job of jobs) {\n  const jobName = job.jobName;\n  let best = null;\n\n  for (const f of itemFiles) {\n    const fileName = f.path.split('/').pop();\n    const m = fileName.match(/^(.+?)_(\\d+(?:\\.\\d+)+)(?:_\\d{6}-\\d{6})?\\.item$/i);\n    let cleanName, version;\n    if (m) {\n      cleanName = m[1];\n      version = m[2];\n    } else {\n      cleanName = fileName.replace(/\\.item$/i, '');\n      version = '0.0.0';\n    }\n    if (cleanName.toLowerCase() !== jobName.toLowerCase()) continue;\n    if (!best || compareVersions(version, best.talendVersion) > 0) {\n      best = { filePath: f.path, talendVersion: version };\n    }\n  }\n\n  if (best) {\n    results.push({\n      json: {\n        jobName,\n        filePath: best.filePath,\n        talendVersion: best.talendVersion,\n        branch: job.branch,\n        repoFullName: `${job.githubOwner}/${job.githubRepo}`,\n        commitMsg: `Regenerated documentation from Confluence folder listing`,\n        matchFound: true\n      }\n    });\n  } else {\n    results.push({\n      json: {\n        jobName,\n        matchFound: false,\n        reason: `No .item file matching \"${jobName}\" found under /process/ on branch ${job.branch}`\n      }\n    });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        26208,
+        14160
+      ],
+      "id": "cd1a3dc8-d986-4d3c-b965-911b9923df47",
+      "name": "Extract & Match Job Files"
+    },
+    {
+      "parameters": {
+        "content": "### make sure to add the configuration for the workflow for example :\n\n\"sourceFolderId\" : 9240606,\n\"targetFolderId\": 9437211,\n\"confluenceBaseUrl\" : \"https://integrationteam.atlassian.net/wiki\",\n\"branch\" : \"main\",\n\"githubOwner\" : \"integration-team-OS\",\n\"githubRepo\" : \"AutomatisationDocTalend\",\n\"spacekey\" :  \"Test\"",
+        "height": 320,
+        "width": 512
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        25200,
+        14352
+      ],
+      "id": "5cd65fbe-a3bf-4294-a40a-65b0367242d3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🔄 MODIFICATION MINIMALE: Process ALL jobs instead of just the first one\nconst results = [];\n\n// Helper function to escape HTML\nfunction escapeHtml(text) {\n  if (text === null || text === undefined) return '';\n  return String(text)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&#039;');\n}\n\n// NEW: Helper function to format and escape field values (handles strings, arrays, and objects)\nfunction formatField(value) {\n  if (value === null || value === undefined) return '';\n  \n  if (Array.isArray(value)) {\n    return value.map(item => {\n      if (typeof item === 'object' && item !== null) {\n        // Format as key-value pairs if possible (e.g., { NAME: '...', VALUE: '...' } or { key: '...', value: '...' })\n        const keys = Object.keys(item);\n        if (keys.length >= 2) {\n          return `<strong>${escapeHtml(String(item[keys[0]]))}</strong>: ${escapeHtml(String(item[keys[1]]))}`;\n        }\n        // Fallback for single key or other objects\n        return escapeHtml(JSON.stringify(item));\n      }\n      return escapeHtml(String(item));\n    }).join('<br/>');\n  }\n  \n  if (typeof value === 'object') {\n    return escapeHtml(JSON.stringify(value));\n  }\n  \n  return escapeHtml(String(value));\n}\n\n// Helper to create HTML table with specific headers and row data mapping\nfunction createTable(headers, rows, rowMapper) {\n  let html = '<table class=\"wrapped\" style=\"width:100%; border-collapse: collapse;\">';\n  html += '<thead><tr style=\"background-color: #f5f5f5;\">';\n  headers.forEach(h => {\n    html += `<th style=\"padding: 8px; border: 1px solid #ddd; text-align: left;\"><strong>${escapeHtml(h)}</strong></th>`;\n  });\n  html += '</tr></thead><tbody>';\n  \n  rows.forEach(row => {\n    html += '<tr>';\n    const cells = rowMapper(row);\n    cells.forEach(cell => {\n      // Added vertical-align: top for better rendering of multi-line content (like formatted headers/body)\n      html += `<td style=\"padding: 8px; border: 1px solid #ddd; vertical-align: top;\">${cell}</td>`; \n    });\n    html += '</tr>';\n  });\n  \n  html += '</tbody></table>';\n  return html;\n}\n\n// 🔄 MODIFICATION MINIMALE: Loop through ALL jobs\nfor (const item of $input.all()) {\n  const inputData = item.json;\n\n  // 🌟 INTEGRATION: Generate the Mermaid Image URL directly here\n  const mermaidCode = inputData.llmDiagram || \"\";\n  let diagramImageUrl = inputData.diagramImageUrl || \"\"; // Fallback if already generated\n  if (!diagramImageUrl && mermaidCode) {\n    const base64Code = Buffer.from(mermaidCode)\n      .toString('base64')\n      .replace(/\\+/g, '-')\n      .replace(/\\//g, '_')\n      .replace(/=/g, '');\n    diagramImageUrl = `https://mermaid.ink/img/${base64Code}`;\n  }\n\n  // Build HTML content\n  let html = '';\n\n  // Title with Status Macro\n  html += '<h1>Integration Specification</h1>';\n  html += '<ac:structured-macro ac:name=\"status\" ac:schema-version=\"1\">';\n  html += '<ac:parameter ac:name=\"title\">In progress</ac:parameter>';\n  html += '<ac:parameter ac:name=\"colour\">Yellow</ac:parameter>';\n  html += '</ac:structured-macro>';\n  html += '<p></p>';\n\n  // 1. INTRODUCTION\n  html += '<h2>Introduction</h2>';\n  if (inputData.introduction && inputData.introduction.purpose) {\n    html += `<p>${formatField(inputData.introduction.purpose)}</p>`;\n  } else {\n    html += '<p><em>No introduction metadata found in this job.</em></p>';\n  }\n\n  // 2. SEQUENCE DIAGRAM\n  html += '<h2>Sequence diagram</h2>';\n  if (diagramImageUrl) {\n    html += `<img src=\"${formatField(diagramImageUrl)}\" alt=\"UML Sequence Diagram\" style=\"max-width: 100%; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);\" />`;\n    html += `<p><em>💡 Diagram generated automatically from Talend job structure.</em></p>`;\n  } else {\n    html += '<p><em>No sequence diagram available.</em></p>';\n  }\n\n  // 3. SQL / SOQL REQUESTS\n  html += '<h2>SQL / SOQL Requests</h2>';\n  if (inputData.sqlRequests && inputData.sqlRequests.length > 0) {\n    html += createTable(\n      ['ID', 'Description', 'Query'],\n      inputData.sqlRequests,\n      sql => [escapeHtml(sql.id || ''), escapeHtml(sql.description || ''), `<code>${escapeHtml(sql.sql || '')}</code>`]\n    );\n  } else {\n    html += '<p><em>No SQL/SOQL requests detected</em></p>';\n  }\n\n  // 4. SOAP/REST API REQUESTS\n  html += '<h2>SOAP/REST API Requests</h2>';\n  if (inputData.apiRequests && inputData.apiRequests.length > 0) {\n    html += createTable(\n      ['Request Name', 'Method', 'URL', 'Body', 'Headers', 'Query Parameters'],\n      inputData.apiRequests,\n      api => [\n        formatField(api.requestName),\n        formatField(api.method),\n        formatField(api.url),\n        formatField(api.body),      // Now safely handles arrays/objects\n        formatField(api.headers),   // Now safely handles arrays/objects\n        formatField(api.queryParams)\n      ]\n    );\n  } else {\n    html += '<p><em>No SOAP/REST API requests detected</em></p>';\n  }\n\n  // 5. MAPPING\n  html += '<h2>Mapping</h2>';\n  html += '<p><strong>Legend:</strong></p>';\n  html += '<ul>';\n  html += '<li>Les lignes en blanc sont des mappings validés et développés.</li>';\n  html += '<li>Les lignes en jaune sont des mappings non validés ni développés.</li>';\n  html += '<li>Les lignes en verts sont des mappings validés et à développer.</li>';\n  html += '<li>Les lignes en gris sont des mappings à décommissionner.</li>';\n  html += '</ul>';\n\n  if (inputData.mappings && inputData.mappings.length > 0) {\n    inputData.mappings.forEach(map => {\n      html += `<h3>${formatField(map.mapName)}</h3>`;\n      html += createTable(\n        ['Input Field', 'Field', 'Type', 'Description', 'Example', 'Output Field', 'Type', 'Description', 'Example', 'Mapping Rule'],\n        map.rows,\n        row => {\n          const srcField = row.srcField || '';\n          const isNullField = srcField.toUpperCase() === 'NULL' || srcField.toUpperCase() === 'ISNULL';\n          \n          const inputFieldHtml = isNullField \n            ? `<strong>${formatField(row.srcComp)}</strong>` \n            : `<strong>${formatField(row.srcComp)}</strong>.${formatField(srcField)}`;\n\n          return [\n            inputFieldHtml,                           \n            formatField(srcField),                    \n            formatField(row.srcType),                 \n            '',                                       \n            '',                                       \n            formatField(row.destField || row.destComp), \n            formatField(row.destType),                \n            '',                                       \n            '',                                       \n            formatField(row.rule)                     \n          ];\n        }\n      );\n    });\n  } else {\n    html += '<p><em>No tMap components detected in this job.</em></p>';\n  }\n\n  // 6. INPUT\n  html += '<h2>Input (Table / File / API request)</h2>';\n\n  if (inputData.inputs && inputData.inputs.table && inputData.inputs.table.length > 0) {\n    html += '<h3>Table</h3>';\n    html += createTable(\n      ['Database', 'Server name', 'User name', 'Environment', 'Table name'],\n      inputData.inputs.table,\n      t => [formatField(t.database), formatField(t.serverName), formatField(t.userName), formatField(t.environment), formatField(t.tableName)]\n    );\n  }\n\n  if (inputData.inputs && inputData.inputs.file && inputData.inputs.file.length > 0) {\n    html += '<h3>File</h3>';\n    html += createTable(\n      ['Parameter', 'File Name', 'Format', 'M/O', 'Encoding', 'Folder path', 'File example'],\n      inputData.inputs.file,\n      f => [formatField(f.parameter), formatField(f.fileName), formatField(f.format), formatField(f.mo), formatField(f.encoding), formatField(f.folderPath), formatField(f.fileExample)]\n    );\n  }\n\n  if (inputData.inputs && inputData.inputs.apiRequest && inputData.inputs.apiRequest.length > 0) {\n    html += '<h3>API request (WS case)</h3>';\n    html += createTable(\n      ['Method', 'Headers', 'Query parameters', 'Path', 'Body', 'Param', 'Possible values'],\n      inputData.inputs.apiRequest,\n      a => [\n        formatField(a.method),\n        formatField(a.headers),\n        formatField(a.queryParams),\n        formatField(a.path),\n        formatField(a.body),\n        formatField(a.param),\n        formatField(a.possibleValues)\n      ]\n    );\n  }\n\n  if (!inputData.inputs || Object.keys(inputData.inputs).length === 0) {\n    html += '<p><em>No inputs detected</em></p>';\n  }\n\n  // 7. OUTPUT\n  html += '<h2>Output (Table / File / API response)</h2>';\n\n  if (inputData.outputs && inputData.outputs.table && inputData.outputs.table.length > 0) {\n    html += '<h3>Table</h3>';\n    html += createTable(\n      ['Table name', 'Type', 'Database'],\n      inputData.outputs.table,\n      t => [formatField(t.tableName), formatField(t.type), formatField(t.database)]\n    );\n  }\n\n  if (inputData.outputs && inputData.outputs.file && inputData.outputs.file.length > 0) {\n    html += '<h3>File</h3>';\n    html += createTable(\n      ['Parameter', 'File Name', 'Format', 'M/O', 'Encoding', 'Folder path', 'File example'],\n      inputData.outputs.file,\n      f => [formatField(f.parameter), formatField(f.fileName), formatField(f.format), formatField(f.mo), formatField(f.encoding), formatField(f.folderPath), formatField(f.fileExample)]\n    );\n  }\n\n  if (inputData.outputs && inputData.outputs.apiResponse && inputData.outputs.apiResponse.length > 0) {\n    html += '<h3>API response (WS case)</h3>';\n    html += createTable(\n      ['Status Code', 'Response body', 'Params', 'Possible values'],\n      inputData.outputs.apiResponse,\n      a => [formatField(a.statusCode), formatField(a.responseBody), formatField(a.params), formatField(a.possibleValues)]\n    );\n  }\n\n  if (!inputData.outputs || Object.keys(inputData.outputs).length === 0) {\n    html += '<p><em>No outputs detected</em></p>';\n  }\n\n  // 8. JOB PARAMS\n  html += '<h2>Job params</h2>';\n  if (inputData.jobParams && inputData.jobParams.length > 0) {\n    html += createTable(\n      ['Parameter name', 'Description', 'Type', 'Value'],\n      inputData.jobParams,\n      p => [formatField(p.parameterName), formatField(p.description), formatField(p.type), formatField(p.value)]\n    );\n  } else {\n    html += '<p><em>No job parameters detected</em></p>';\n  }\n\n  // 9. ENDPOINTS\n  html += '<h2>Endpoints</h2>';\n  if (inputData.endpoints && inputData.endpoints.length > 0) {\n    html += createTable(\n      ['Service', 'Environment', 'Port', 'URL'],\n      inputData.endpoints,\n      ep => [formatField(ep.service), formatField(ep.environment), formatField(ep.port), formatField(ep.url)]\n    );\n  } else {\n    html += '<p><em>No endpoints detected</em></p>';\n  }\n\n  // 10. ANNEX\n  html += '<h2>Annex</h2>';\n  html += '<p><em>No annex content</em></p>';\n\n  // Footer\n  html += '<hr/>';\n  html += `<p><em>Generated on ${new Date().toISOString().split('T')[0]} | Auto-generated by n8n workflow</em></p>`;\n\n  // Extract Job Name and Version from the Talend introduction\n  const rawJobName = inputData.introduction?.jobName || \"Unknown_Job_0.1.0\";\n  const versionMatch = rawJobName.match(/_(\\d+\\.\\d+)$/);\n  const tVersion = inputData.talendVersion || \"0.1.0\"; \n  // 🔄 MODIFICATION MINIMALE: Use current job's JobName instead of first()\n  const JobTitle = inputData.JobName || inputData.introduction?.jobName || \"Unknown_Job\";\n\n  // 🏷️ Commit tag: when this run is NOT a new deployed version, prefix the title\n  // with \"[commit <message>]\" so it's obvious this doc reflects an in-between commit,\n  // not the version currently live in TMC. Updates automatically every time a new\n  // commit comes in, since commitMsg always reflects the commit that triggered this run.\n  const isNewVersion = inputData.isNewVersion !== false && String(inputData.isNewVersion).toLowerCase() !== 'false';\n  const rawCommitMsg = inputData.commitMsg || \"\";\n  // Sanitize: first line only (commit messages can be multi-line), swap double quotes\n  // (would otherwise break the raw JSON template used in the Confluence API calls),\n  // and cap length so the Confluence page title doesn't get unreasonably long.\n  const commitMsgClean = rawCommitMsg.split('\\n')[0].trim().replace(/\"/g, \"'\").substring(0, 80);\n  const commitTag = (!isNewVersion && commitMsgClean) ? `[${commitMsgClean}] ` : \"\";\n\n  // 🔄 MODIFICATION MINIMALE: Push to results array instead of returning single item\n  results.push({\n    json: {\n      //...inputData,\n      confluenceHtml: html,\n      pageTitle: `[refactored] ${JobTitle}` , //change if needed \n      extractedJobName: JobTitle\n    }\n  });\n}\n\n// 🔄 MODIFICATION MINIMALE: Return ALL processed jobs\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        29984,
+        14176
+      ],
+      "id": "c2a89102-d903-48d3-a017-931857bae8c1",
+      "name": "HTML generation"
+    },
+    {
+      "parameters": {
+        "content": "### by default the new pages will have the tag [refactored] it can be changed on the node \"HTML generation\" on line 314 ",
+        "height": 192
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        29872,
+        13936
+      ],
+      "id": "dcc17423-c644-4794-8582-6dee99dc7680",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {
+    "Basic LLM Chain": [
+      {
+        "json": {
+          "text": "sequenceDiagram\n    participant SF as Salesforce_API\n    participant DB as MSSQL_Database\n    participant InFiles as Input_Files\n    participant ETL as Transformation_Engine\n    participant OutFiles as Output_Files\n\n    SF->>ETL: Extract Salesforce Records (Batch 1)\n    ETL->>ETL: Map & Aggregate Data\n    ETL->>OutFiles: Generate Output File (Delimited_8)\n\n    SF->>ETL: Extract Salesforce Records (Batch 2)\n    DB->>ETL: Query MSSQL Reference Data\n    InFiles->>ETL: Read Source CSVs\n    ETL->>ETL: Multi-Source Join & Map\n    ETL->>OutFiles: Generate Output File (Delimited_1)\n\n    SF->>ETL: Extract Salesforce Records (Batch 3)\n    DB->>ETL: Query MSSQL Reference Data\n    InFiles->>ETL: Read Source CSVs\n    ETL->>ETL: Multi-Source Join & Map\n    ETL->>OutFiles: Generate Output Files (Delimited_2 & 3)\n\n    SF->>ETL: Extract Salesforce Records (Batch 4)\n    ETL->>ETL: Aggregate & Replicate Data Streams\n    ETL->>ETL: Field Extraction & Intermediate Processing\n    ETL->>OutFiles: Generate Output Files (Delimited_6 & 7)\n\n    Note over SF,OutFiles: Data Pipeline Execution Sequence"
+        }
+      },
+      {
+        "json": {
+          "text": "sequenceDiagram\nparticipant Source as Delimited File Source\nparticipant Pipeline as ETL Data Pipeline\nparticipant Target as Delimited File Target\nSource->>Pipeline: Extract delimited records\nPipeline->>Pipeline: Process & transform data\nPipeline->>Target: Load delimited records"
+        }
+      },
+      {
+        "json": {
+          "text": "sequenceDiagram\n    participant Client\n    participant API_Request as REST Request Receiver\n    participant JSON_Parser as JSON Field Extractor\n    participant Router as Conditional Routing Engine\n    participant Transformer as Data Transformation Logic\n    participant Service_A as External Service A\n    participant Service_B as External Service B\n    participant Service_C as External Service C\n    participant Service_D as External Service D\n    participant Response_Builder as JSON Response Assembler\n\n    Client->>API_Request: Submit Order Shipment Payload\n    API_Request->>JSON_Parser: Parse Incoming Request Body\n    JSON_Parser->>Router: Extracted Fields & Routing Context\n    Router->>Service_A: Conditionally Invoke Service A\n    Router->>Service_B: Conditionally Invoke Service B\n    Router->>Service_C: Conditionally Invoke Service C\n    Service_A-->>Router: API Response / Fault Status\n    Service_B-->>Router: API Response / Fault Status\n    Service_C-->>Router: API Response / Fault Status\n    Router->>Transformer: Merge Responses & Apply Business Rules\n    Transformer->>JSON_Parser: Re-extract & Format Processed Data\n    JSON_Parser->>Response_Builder: Write Aggregated JSON Payload\n    Response_Builder->>Service_D: Invoke Final Service with Payload\n    Service_D-->>Response_Builder: Final API Response / Fault Status\n    alt Success Route\n        Response_Builder->>Client: Return Success REST Response\n    else Fault/Error Route\n        Response_Builder->>Client: Return Error REST Response\n    end"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build LLM Prompt Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "HTML generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript17": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript20",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript20",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript21",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript21",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript20": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript21": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Update row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request7": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "GitHub: Get Repo Tree",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confluence: Get Child Job Pages": {
+      "main": [
+        [
+          {
+            "node": "Extract & Match Job Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub File Found?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Skipped Job (No Match)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Skipped Job (No Match)": {
+      "main": [
+        [
+          {
+            "node": "Write Skipped Job Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub: Get Repo Tree": {
+      "main": [
+        [
+          {
+            "node": "Confluence: Get Child Job Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Extract Diagram From Chain",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript17",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Prompt Input": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Diagram From Chain": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Qwen Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract & Match Job Files": {
+      "main": [
+        [
+          {
+            "node": "GitHub File Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML generation": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "c1764a71-b8cd-48a3-bc8e-ea0ea1ec4aca",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "559d3979953d50cdec9275c85296ec78e32ed0355d70c752cc82ee6f5c963ab4"
+  },
+  "nodeGroups": [],
+  "id": "NfPnecfdF6oFSvAA",
+  "tags": []
+}
